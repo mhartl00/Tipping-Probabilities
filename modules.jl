@@ -20,8 +20,11 @@ sigma = range(sigma_min, step = sigma_step, length = sigma_length);
 #input variables
 #	lmax:	fixed value of lambda_max to use
 #	test:	use test parameters (test = true) or regular parameters (test = false)
-#output variable
-#	p:		2D array, each column corresponds to one value of sigma
+#output variable: 2D array
+#	first line: lmax, sigma[1], ..., sigma[n]
+#	from second line on 
+#		- first columns has rates
+#		- all other columns hold the calculated probabilities
 function varysigma(lmax; test = false)
 	#set parameters
 	plot_parameters(test);
@@ -33,12 +36,17 @@ function varysigma(lmax; test = false)
 		F[n] = TippingProblem(f, sigma[n], get_lambda(lmax), lmax);
 	end
 
+	#set up the return array
+	p = Array{Float64, 2}(undef, nrates + 1, sigma_length + 1)
+	p[1, 1] = lmax
+	p[1, 2:end] = sigma
+	p[2:end, 1] = rates
+	
 	#do the calculations
-	p = Array{Float64, 2}(undef, nrates, sigma_length)	#one column per lmax
 	for n in 1:sigma_length
 		smpl = attractorsample(F[n], 1.0, npoints, nsteps);	#here the sample depends on sigma
-		probs(r) = tippingprob(F[n], smpl, r, ntrials, qmin(F[n]), qmax(F[n]))
-		p[:, n] = probs.(rates);
+		prob(r) = tippingprob(F[n], smpl, r, ntrials, qmin(F[n]), qmax(F[n]))
+		p[2:end, n + 1] = prob.(rates);
 	end
 
 	#return value
@@ -83,29 +91,32 @@ end
 #input variables
 #	sigma:	fixed value of sigma to use
 #	test:	use test parameters (test = true) or regular parameters (test = false)
-#output variable
-#	p:		2D array, each column corresponds to one value of lambda_max
-function varylmax(; sigma = sigma, test = false)
-	#set parameters
-	plot_parameters(test);
-	plot_rates(test);
-
+#output variable: 2D array
+#	first line: sigma, lambda[1], ..., lambda[n]
+#	from second line on 
+#		- first columns has rates
+#		- all other columns hold the calculated probabilities
+function varylmax(; test = false)
+	#set plot parameters
+	plot_parameters(test)
+	plot_rates(test)
+	
 	#attractor sample
 	#NB: does not depend on lmax
-	spl = attractorsample(F[1], 1.0, npoints, nsteps);
+	spl = attractorsample(F[1], 1.0, npoints, nsteps)
 	
-	#tipping probability functions
-	prob = Array{Any, 1}(undef, lmax_length)
-	for n in 1:lmax_length
-		prob[n] = function(r)
-			return tippingprob(F[n], spl, r, ntrials, qmin(F[n]), qmax(F[n]))
-		end
-	end
+	#set up the return array
+	p = Array{Float64, 2}(undef, nrates + 1, lmax_length + 1)
+	p[1, 1] = sigma
+	p[1, 2:end] = lmax
+	p[2:end, 1] = rates
 	
 	#do the calculations
-	p = Array{Float64, 2}(undef, nrates, lmax_length)	#one column per lmax
 	for n in 1:lmax_length
-		p[:, n] = prob[n].(rates);
+		#shortcut for tipping probability function
+		prob(r) = tippingprob(F[n], spl, r, ntrials, qmin(F[n]), qmax(F[n]))
+		#apply to rates
+		p[2:end, n + 1] = prob.(rates)
 	end
 	
 	#return value
